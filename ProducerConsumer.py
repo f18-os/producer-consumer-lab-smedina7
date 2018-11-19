@@ -66,69 +66,38 @@ def displayFrames(inputBuffer):
     # cleanup the windows
     cv2.destroyAllWindows()
 
-def convertToGreyscale(fileName, outputBuffer):
-    # initialize frame count
-    count = 0
+def convertToGreyscale(inputBuffer):
     
-    # go through each frame in the buffer until the buffer is empty
-    while not outputBuffer.empty():
-        # get the next frame
-        frameAsText = ouputBuffer.get()
-
-        # decode the frame 
+    while not inputBuffer.empty():
+        frameAsText = inputBuffer.get()
+    
+        #from EXTRACT AND DISPLAY
+        
+        #decode the frame
         jpgRawImage = base64.b64decode(frameAsText)
-
+    
         # convert the raw frame to a numpy array
         jpgImage = np.asarray(bytearray(jpgRawImage), dtype=np.uint8)
-        
+    
         # get a jpg encoded frame
         img = cv2.imdecode( jpgImage ,cv2.IMREAD_UNCHANGED)
-
-    # load the next file
-    #inputFrame = cv2.imread(fileName, cv2.IMREAD_COLOR)
-    
-    # open video file
-    vidcap = cv2.VideoCapture(fileName)
-
-    # read first image
-    success,image = vidcap.read()
-    
-    count = 0
-    
-    print("Reading frame {} {} ".format(count, success))
-    
-    while success:
+        
+        #from convertToGreyscale
+        
+        # convert the image to grayscale
+        grayscaleFrame = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        
         # get a jpg encoded frame
-        success, jpgImage = cv2.imencode('.jpg', image)
-
+        success, jpgImage = cv2.imencode('.jpg', grayscaleFrame)
+        
+        #from extract frames def
+        
         #encode the frame as base 64 to make debugging easier
         jpgAsText = base64.b64encode(jpgImage)
-
-        # add the frame to the buffer
-        outputBuffer.put(jpgAsText)
-       
-        success,image = vidcap.read()
-        print('Reading frame {} {}'.format(count, success))
-        count += 1
-
-        print("Converting frame {}".format(count))
-
-        # convert the image to grayscale
-        grayscaleFrame = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        
+        #put to gray queue
+        outQueue.put(jpgAsText)
     
-        # generate output file name
-        outFileName = "{}/grayscale_{:04d}.jpg".format(outputBuffer, count)
-
-        # write output file
-        cv2.imwrite(outFileName, grayscaleFrame)
-
-        count += 1
-
-        # generate input file name for the next frame
-        fileName = "{}/frame_{:04d}.jpg".format(outputBuffer, count)
-
-        # load the next frame
-        inputFrame = cv2.imread(fileName, cv2.IMREAD_COLOR)
 
     
 
@@ -145,7 +114,7 @@ outQueue = queue.Queue()
 extractFrames(filename,extractionQueue)
 
 #convert to conver to Greyscale
-convertToGreyscale(filename,outQueue)
+convertToGreyscale(extractionQueue)
 
 # display the frames
-displayFrames(extractionQueue)
+displayFrames(outQueue)
