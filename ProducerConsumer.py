@@ -1,12 +1,22 @@
 #!/usr/bin/env python3
 
-import threading
+from threading import Thread
 import cv2
 import numpy as np
 import base64
 import queue
 
-def extractFrames(fileName, outputBuffer):
+# filename of clip to load
+filename = 'clip.mp4'
+
+# shared queue  
+extractionQueue = queue.Queue(10)
+
+# output queue
+outQueue = queue.Queue(10)
+
+
+def extractFrames(fileName):
     # Initialize frame count 
     count = 0
 
@@ -25,23 +35,30 @@ def extractFrames(fileName, outputBuffer):
         jpgAsText = base64.b64encode(jpgImage)
 
         # add the frame to the buffer
-        outputBuffer.put(jpgAsText)
+        extractionQueue.put(jpgAsText)
        
         success,image = vidcap.read()
         print('Reading frame {} {}'.format(count, success))
         count += 1
 
     print("Frame extraction complete")
+    
+    extractionQueue.put("Frame extraction complete")
 
 
-def displayFrames(inputBuffer):
+def displayFrames():
     # initialize frame count
     count = 0
 
     # go through each frame in the buffer until the buffer is empty
-    while not inputBuffer.empty():
+    while(1):
+        
         # get the next frame
-        frameAsText = inputBuffer.get()
+        frameAsText = outQueue.get()
+        
+        if(frameAsText == "Break"):
+           print("Done")
+           break
 
         # decode the frame 
         jpgRawImage = base64.b64decode(frameAsText)
@@ -66,10 +83,14 @@ def displayFrames(inputBuffer):
     # cleanup the windows
     cv2.destroyAllWindows()
 
-def convertToGreyscale(inputBuffer):
+def convertToGreyscale():
     
-    while not inputBuffer.empty():
-        frameAsText = inputBuffer.get()
+    while(1):
+        frameAsText = extractionQueue.get()
+        
+        if(frameAsText == "Frame extraction complete"):
+            outQueue.put("Break")
+            break
     
         #from EXTRACT AND DISPLAY
         
@@ -95,26 +116,23 @@ def convertToGreyscale(inputBuffer):
         #encode the frame as base 64 to make debugging easier
         jpgAsText = base64.b64encode(jpgImage)
         
-        #put to gray queue
+        #put to gray 
         outQueue.put(jpgAsText)
-    
+        
 
-    
+thread1 = Thread(target = extractFrames, args=[filename])
+thread2 = Thread(target = convertToGreyscale, args=[])
+thread3 = Thread(target = displayFrames, args=[])
 
-# filename of clip to load
-filename = 'clip.mp4'
-
-# shared queue  
-extractionQueue = queue.Queue()
-
-# output queue
-outQueue = queue.Queue()
+thread1.start()
+thread2.start()
+thread3.start()
 
 # extract the frames
-extractFrames(filename,extractionQueue)
+#extractFrames(filename)
 
 #convert to conver to Greyscale
-convertToGreyscale(extractionQueue)
+#convertToGreyscale()
 
 # display the frames
-displayFrames(outQueue)
+#displayFrames()
