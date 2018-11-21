@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from threading import Thread
+import threading
 import cv2
 import numpy as np
 import base64
@@ -14,6 +15,12 @@ extractionQueue = queue.Queue(10)
 
 # output queue
 outQueue = queue.Queue(10)
+
+#semaphores
+sem_putExt = threading.Semaphore(10)
+sem_putOut = threading.Semaphore(10)
+sem_getExt = threading.Semaphore(0)
+sem_getOut = threading.Semaphore(0)
 
 
 def extractFrames(fileName):
@@ -35,7 +42,9 @@ def extractFrames(fileName):
         jpgAsText = base64.b64encode(jpgImage)
 
         # add the frame to the buffer
+        sem_putExt.acquire()
         extractionQueue.put(jpgAsText)
+        sem_getExt.release()
        
         success,image = vidcap.read()
         print('Reading frame {} {}'.format(count, success))
@@ -43,7 +52,9 @@ def extractFrames(fileName):
 
     print("Frame extraction complete")
     
+    sem_putExt.acquire()
     extractionQueue.put("Frame extraction complete")
+    sem_getExt.release()
 
 
 def displayFrames():
@@ -54,11 +65,16 @@ def displayFrames():
     while(1):
         
         # get the next frame
+        sem_getOut.acquire()
         frameAsText = outQueue.get()
         
         if(frameAsText == "Break"):
            print("Done")
            break
+        
+        sem_putOut.release()
+        
+        
 
         # decode the frame 
         jpgRawImage = base64.b64decode(frameAsText)
@@ -86,12 +102,19 @@ def displayFrames():
 def convertToGreyscale():
     
     while(1):
+        sem_getExt.acquire()
         frameAsText = extractionQueue.get()
         
         if(frameAsText == "Frame extraction complete"):
+            #sem_putOut.acquire()
             outQueue.put("Break")
+            print("Grey Done")
+            sem_getOut.release()
             break
-    
+        
+        sem_putExt.release()
+        
+       
         #from EXTRACT AND DISPLAY
         
         #decode the frame
@@ -117,8 +140,9 @@ def convertToGreyscale():
         jpgAsText = base64.b64encode(jpgImage)
         
         #put to gray 
+        sem_putOut.acquire()
         outQueue.put(jpgAsText)
-        
+        sem_getOut.release()
 
 thread1 = Thread(target = extractFrames, args=[filename])
 thread2 = Thread(target = convertToGreyscale, args=[])
